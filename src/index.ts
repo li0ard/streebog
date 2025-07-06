@@ -1,173 +1,201 @@
-import { A, C, PI, TAU } from "./const";
-
-/** Addition of two 512 bit numbers */
-const add512 = (a: Uint8Array, b: Uint8Array, result: Uint8Array) => {
-    let carry = 0;
-    for (let i = 63; i >= 0; i--) {
-        const sum = a[i] + b[i] + carry;
-        result[i] = sum & 0xFF;
-        carry = sum >> 8;
-    }
-}
+import { BLOCK_SIZE } from "./const";
+import { transformG, add512 } from "./utils";
 
 /**
- * `X`-transformation.
- * The input of the `X` function is two sequences, each 512 bits long,
- * and the output of the function is the XOR of these two sequences.
+ * Streebog core class
  */
-const transformX = (a: Uint8Array, b: Uint8Array, result: Uint8Array) => {
-    for (let i = 0; i < 64; i++) {
-        result[i] = a[i] ^ b[i];
-    }
-}
+export class Streebog {
+    public readonly blockLen: number = BLOCK_SIZE
+    public is512: boolean;
+    public buffer: Uint8Array = new Uint8Array(BLOCK_SIZE);
+    public bufferLength: number = 0;
+    public hash: Uint8Array = new Uint8Array(BLOCK_SIZE);
+    public n: Uint8Array = new Uint8Array(BLOCK_SIZE);
+    public sigma: Uint8Array = new Uint8Array(BLOCK_SIZE);    
 
-/**
- * `S`-transformation.
- * The `S` function is a regular substitution function. Each byte of the
- * 512-bit input sequence is replaced by the corresponding byte from
- * the `PI` substitution table.
- */
-const transformS = (result: Uint8Array) => {
-    for (let i = 0; i < 64; i++) {
-        result[i] = PI[result[i]];
-    }
-}
-
-/**
- * `P`-transformation.
- * Permutation function. For each pair of bytes from the input sequence,
- * one byte is replaced by another.
- */
-const transformP = (result: Uint8Array) => {
-    const temp = new Uint8Array(result);
-    for (let i = 0; i < 64; i++) {
-        result[i] = temp[TAU[i]];
-    }
-}
-
-/**
- * `L`-transformation.
- * Represents the multiplication of a 64-bit input vector by a 64x64 binary matrix `A`.
- */
-const transformL = (result: Uint8Array) => {
-    const input = new BigUint64Array(8);
-    for (let i = 0; i < 8; i++) {
-        let value = 0n;
-        for (let j = 0; j < 8; j++) {
-            value = (value << 8n) | BigInt(result[i*8 + j]);
-        }
-        input[i] = value;
+    /**
+     * Streebog core class
+     * @param is512 Use 512 bits version of algorithm
+     */
+    constructor(is512: boolean) {
+        this.is512 = is512;
+        this.reset();
     }
 
-    const output = new BigUint64Array(8);
-    for (let i = 0; i < 8; i++) {
-        output[i] = 0n;
-        for (let j = 0; j < 64; j++) {
-            if ((input[i] >> BigInt(63 - j)) & 1n) {
-                output[i] ^= A[j];
+    /** Reset hash state */
+    reset() {
+        this.buffer = new Uint8Array(BLOCK_SIZE);
+        this.bufferLength = 0;
+        this.hash = new Uint8Array(BLOCK_SIZE).fill(this.is512 ? 0 : 1);
+        this.n = new Uint8Array(BLOCK_SIZE);
+        this.sigma = new Uint8Array(BLOCK_SIZE);
+    }
+    /** Reset hash state */
+    destroy() {
+        this.reset()
+    }
+
+    /** Update hash buffer */
+    update(data: Uint8Array): this {
+        let offset = 0;
+
+        if (this.bufferLength > 0) {
+            const needed = BLOCK_SIZE - this.bufferLength;
+            const available = Math.min(needed, data.length);
+            
+            this.buffer.set(data.subarray(0, available), this.bufferLength);
+            this.bufferLength += available;
+            offset = available;
+
+            if (this.bufferLength === BLOCK_SIZE) {
+                this.processBlock(this.buffer, BLOCK_SIZE);
+                this.bufferLength = 0;
             }
         }
-    }
 
-    const buffer = new Uint8Array(64);
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-            buffer[i*8 + j] = Number((output[i] >> BigInt((7-j)*8)) & 0xFFn);
-        }
-    }
-
-    result.set(buffer);
-}
-
-/**
- * XSPL-algorithm.
- * Round key calculation function.
- * 
- * 1. `X` - Addition modulo 2;
- * 2. `S` - Substitution;
- * 3. `P` - Permutation;
- * 4. `L` - Linear transformation
- */
-const keySchedule = (keys: Uint8Array, iterIndex: number) => {
-    const c = new Uint8Array(C[iterIndex]);
-    const temp = new Uint8Array(64);
-
-    transformX(keys, c, temp);
-    transformS(temp);
-    transformP(temp);
-    transformL(temp);
-
-    keys.set(temp);
-}
-
-/**
- * `E`-transformation.
- * Part of compression function.
- */
-const transformE = (keys: Uint8Array, block: Uint8Array, state: Uint8Array) => {
-    transformX(block, keys, state);
-    
-    for (let i = 0; i < 12; i++) {
-        transformS(state);
-        transformP(state);
-        transformL(state);
-        keySchedule(keys, i);
-        const temp = new Uint8Array(state);
-        transformX(temp, keys, state);
-    }
-}
-
-/**
- * Compression function `G` aka XSPLEXX-algorithm
- */
-const transformG = (n: Uint8Array, hash: Uint8Array, message: Uint8Array) => {
-    const keys = new Uint8Array(64);
-    const temp = new Uint8Array(64);
-    
-    transformX(n, hash, keys);
-    transformS(keys);
-    transformP(keys);
-    transformL(keys);
-    transformE(keys, message, temp);
-    transformX(temp, hash, temp);
-    transformX(temp, message, hash);
-}
-
-/**
- * Core function for both algorithms
- */
-const streebogCore = (message: Uint8Array, hash: Uint8Array) => {
-    const n = new Uint8Array(64);
-    const sigma = new Uint8Array(64);
-    const blockSize = new Uint8Array(64);
-    const zero = new Uint8Array(64);
-
-    for (let offset = 0; offset < message.length; offset += 64) {
-        const chunk = message.subarray(offset, offset + 64);
-        const block = new Uint8Array(64);
-
-        block.set(chunk);
-
-        if (chunk.length < 64) {
-            block[chunk.length] = 1;
+        while (offset + BLOCK_SIZE <= data.length) {
+            const block = data.subarray(offset, offset + BLOCK_SIZE);
+            this.processBlock(block, BLOCK_SIZE);
+            offset += BLOCK_SIZE;
         }
 
-        const blockReversed = new Uint8Array(block.buffer.slice(0));
+        if (offset < data.length) {
+            const remaining = data.subarray(offset);
+            this.buffer.set(remaining, 0);
+            this.bufferLength = remaining.length;
+        }
+
+        return this
+    }
+
+    private processBlock(chunk: Uint8Array, chunkLength: number) {
+        const block = new Uint8Array(BLOCK_SIZE);
+        block.set(chunk.subarray(0, chunkLength));
+
+        if (chunkLength < BLOCK_SIZE) {
+            block[chunkLength] = 1;
+        }
+
+        const blockReversed = block.slice();
         blockReversed.reverse();
 
-        const sizeBits = chunk.length * 8;
+        const sizeBits = chunkLength * 8;
+        const blockSize = new Uint8Array(BLOCK_SIZE);
         blockSize[62] = (sizeBits >> 8) & 0xFF;
         blockSize[63] = sizeBits & 0xFF;
 
-        transformG(n, hash, blockReversed);
-        add512(n, blockSize, n);
-        add512(sigma, blockReversed, sigma);
+        this.hash = transformG(this.n, this.hash, blockReversed);
+        this.n = add512(this.n, blockSize);
+        this.sigma = add512(this.sigma, blockReversed);
     }
 
-    transformG(zero, hash, n);
-    transformG(zero, hash, sigma);
 
-    hash.reverse();
+    /**
+     * Finalize hash computation and write result into Uint8Array
+     * @param buf - Output Uint8Array
+     */
+    digestInto(buf: Uint8Array): Uint8Array {
+        let finalHash: Uint8Array = this.hash.slice();
+        let finalN: Uint8Array = this.n.slice();
+        let finalSigma: Uint8Array = this.sigma.slice();
+
+        if (this.bufferLength > 0) {
+            const block = new Uint8Array(BLOCK_SIZE);
+            block.set(this.buffer.subarray(0, this.bufferLength));
+            block[this.bufferLength] = 1;
+
+            const blockReversed = block.slice();
+            blockReversed.reverse();
+
+            const sizeBits = this.bufferLength * 8;
+            const blockSize = new Uint8Array(BLOCK_SIZE);
+            blockSize[62] = (sizeBits >> 8) & 0xFF;
+            blockSize[63] = sizeBits & 0xFF;
+
+            finalHash = transformG(finalN, finalHash, blockReversed);
+            finalN = add512(finalN, blockSize);
+            finalSigma = add512(finalSigma, blockReversed);
+        }
+
+        const zero = new Uint8Array(BLOCK_SIZE);
+        finalHash = transformG(zero, finalHash, finalN);
+        finalHash = transformG(zero, finalHash, finalSigma);
+
+        const result: Uint8Array = finalHash.slice().reverse();
+        buf.set(this.is512 ? result : result.subarray(32))
+        this.reset()
+        return buf
+    }
+}
+
+/**
+ * Streebog 256 aka `GOST R 34.11-2012 256 bits`
+ * 
+ * `@noble/hashes`-like class
+ */
+export class Streebog256 extends Streebog {
+    outputLen: number = 32
+    constructor() {
+        super(false);
+    }
+
+    /** Clone hash instance */
+    clone(): Streebog256 {
+        return this._cloneInto();
+    }
+
+    _cloneInto(to?: Streebog256): Streebog256 {
+        to ||= new Streebog256()
+        to.buffer = this.buffer.slice()
+        to.bufferLength = this.bufferLength
+        to.hash = this.hash.slice()
+        to.n = this.n.slice()
+        to.sigma = this.sigma.slice()
+
+        return to
+    }
+
+    /**
+     * Finalize hash computation and return result as Uint8Array
+     */
+    digest(): Uint8Array {
+        const out = this.digestInto(new Uint8Array(this.outputLen))
+        return out
+    }
+}
+
+/**
+ * Streebog 512 bit aka `GOST R 34.11-2012 512 bits`
+ */
+export class Streebog512 extends Streebog {
+    outputLen: number = 64
+    constructor() {
+        super(true);
+    }
+
+    /** Clone hash instance */
+    clone(): Streebog512 {
+        return this._cloneInto();
+    }
+
+    _cloneInto(to?: Streebog512): Streebog512 {
+        to ||= new Streebog512()
+        to.buffer = this.buffer.slice()
+        to.bufferLength = this.bufferLength
+        to.hash = this.hash.slice()
+        to.n = this.n.slice()
+        to.sigma = this.sigma.slice()
+
+        return to
+    }
+
+    /**
+     * Finalize hash computation and return result as Uint8Array
+     */
+    digest(): Uint8Array {
+        const out = this.digestInto(new Uint8Array(this.outputLen))
+        return out
+    }
 }
 
 /**
@@ -175,19 +203,14 @@ const streebogCore = (message: Uint8Array, hash: Uint8Array) => {
  * @param input Input bytes
  * @returns {Uint8Array}
  */
-export const streebog256 = (input: Uint8Array): Uint8Array => {
-    const hash = new Uint8Array(64).fill(1);
-    streebogCore(input, hash);
-    return hash.subarray(32);
-}
+export const streebog256 = (input: Uint8Array): Uint8Array => new Streebog256().update(input).digest();
 
 /**
  * Compute hash with `Streebog 512 bit` (aka `GOST R 34.11-2012 512 bits`)
  * @param input Input bytes
  * @returns {Uint8Array}
  */
-export const streebog512 = (input: Uint8Array): Uint8Array => {
-    const hash = new Uint8Array(64);
-    streebogCore(input, hash);
-    return hash;
-}
+export const streebog512 = (input: Uint8Array): Uint8Array => new Streebog512().update(input).digest();
+
+export * from "./utils"
+export * from "./const"

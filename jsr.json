@@ -1,6 +1,6 @@
 {
     "name": "@li0ard/streebog",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "exports": "./src/index.ts",
     "publish": {
         "include": [
@@ -8,6 +8,7 @@
             "CITATION.cff",
             "README.md",
             "src/**/*.ts"
-        ]
+        ],
+        "exclude": ["src/legacy/*.ts"]
     }
 }

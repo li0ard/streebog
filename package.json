@@ -1,32 +1,37 @@
 {
   "name": "@li0ard/streebog",
-  "version": "0.1.0",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "type": "module",
+  "version": "0.2.0",
   "author": "li0ard",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/li0ard/streebog.git"
   },
-  "bugs": {
-    "url": "https://github.com/li0ard/streebog/issues"
-  },
-  "homepage": "https://github.com/li0ard/streebog#readme",
-  "description": "Streebog hash function in pure TypeScript",
-  "license": "MIT",
-  "scripts": {
-    "build": "rm -rf dist/ && tsc --project tsconfig.build.json"
-  },
+  "main": "dist/index.js",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typedoc": "^0.28.7"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
   },
+  "bugs": {
+    "url": "https://github.com/li0ard/streebog/issues"
+  },
+  "description": "Streebog hash function in pure TypeScript",
   "files": ["dist"],
+  "homepage": "https://github.com/li0ard/streebog#readme",
+  "keywords": ["gost", "crypto", "streebog"],
+  "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
-  "keywords": ["gost", "crypto", "streebog"]
+  "scripts": {
+    "build": "rm -rf dist/ && tsc --project tsconfig.build.json",
+    "docs": "rm -rf docs/ && typedoc --options .config/typedoc/config.cjs"
+  },
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@noble/hashes": "^1.8.0"
+  }
 }

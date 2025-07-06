@@ -1,6 +1,8 @@
 <p align="center">
     <b>@li0ard/streebog</b><br>
     <b>Streebog hash function in pure TypeScript</b>
+    <br>
+    <a href="https://li0ard.is-cool.dev/streebog">docs</a>
     <br><br>
     <a href="https://github.com/li0ard/streebog/actions/workflows/test.yml"><img src="https://github.com/li0ard/streebog/actions/workflows/test.yml/badge.svg" /></a>
     <a href="https://github.com/li0ard/streebog/blob/main/LICENSE"><img src="https://img.shields.io/github/license/li0ard/streebog" /></a>
