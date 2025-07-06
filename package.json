@@ -30,8 +30,5 @@
     "docs": "rm -rf docs/ && typedoc --options .config/typedoc/config.cjs"
   },
   "type": "module",
-  "types": "dist/index.d.ts",
-  "dependencies": {
-    "@noble/hashes": "^1.8.0"
-  }
+  "types": "dist/index.d.ts"
 }
