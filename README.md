@@ -32,6 +32,14 @@ bunx jsr i @li0ard/streebog
 import { streebog256 } from "@li0ard/streebog"
 
 console.log(streebog256(new TextEncoder().encode("hello world")))
+
+// OR
+
+import { Streebog256 } from "@li0ard/streebog"
+
+const hash = new Streebog256()
+hash.update(new TextEncoder().encode("hello world"))
+console.log(hash.digest())
 ```
 
 ### Streebog 512 bit (aka GOST R 34.11-2012 512 bit)
@@ -39,4 +47,12 @@ console.log(streebog256(new TextEncoder().encode("hello world")))
 import { streebog512 } from "@li0ard/streebog"
 
 console.log(streebog512(new TextEncoder().encode("hello world")))
+
+// OR
+
+import { Streebog512 } from "@li0ard/streebog"
+
+const hash = new Streebog512()
+hash.update(new TextEncoder().encode("hello world"))
+console.log(hash.digest())
 ```
