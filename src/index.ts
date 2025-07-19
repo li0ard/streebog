@@ -141,7 +141,7 @@ export class Streebog256 extends Streebog {
         super(false);
     }
 
-    static create() {
+    static create(): Streebog256 {
         return new Streebog256()
     }
 
@@ -179,7 +179,7 @@ export class Streebog512 extends Streebog {
         super(true);
     }
 
-    static create() {
+    static create(): Streebog512 {
         return new Streebog512()
     }
 
