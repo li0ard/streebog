@@ -1,6 +1,6 @@
 {
   "name": "@li0ard/streebog",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "li0ard",
   "repository": {
     "type": "git",
@@ -30,5 +30,8 @@
     "docs": "rm -rf docs/ && typedoc --options .config/typedoc/config.cjs"
   },
   "type": "module",
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@noble/hashes": "^1.8.0"
+  }
 }

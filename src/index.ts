@@ -1,5 +1,7 @@
 import { BLOCK_SIZE } from "./const";
-import { transformG, add512 } from "./utils";
+import { transformG, add512, numberToBytesBE } from "./utils";
+import { HMAC } from "@noble/hashes/hmac";
+import { concatBytes, createHasher, type Hash } from "@noble/hashes/utils";
 
 /**
  * Streebog core class
@@ -139,6 +141,10 @@ export class Streebog256 extends Streebog {
         super(false);
     }
 
+    static create() {
+        return new Streebog256()
+    }
+
     /** Clone hash instance */
     clone(): Streebog256 {
         return this._cloneInto();
@@ -171,6 +177,10 @@ export class Streebog512 extends Streebog {
     outputLen: number = 64
     constructor() {
         super(true);
+    }
+
+    static create() {
+        return new Streebog512()
     }
 
     /** Clone hash instance */
@@ -211,6 +221,55 @@ export const streebog256 = (input: Uint8Array): Uint8Array => new Streebog256().
  * @returns {Uint8Array}
  */
 export const streebog512 = (input: Uint8Array): Uint8Array => new Streebog512().update(input).digest();
+
+/**
+ * HMAC with Streebog 256
+ * @param key Encryption key
+ */
+export const Streebog256HMAC = (key: Uint8Array): HMAC<Hash<Streebog256>> => {
+    return new HMAC(createHasher(Streebog256.create), key)
+}
+
+/**
+ * KDF_GOSTR3411_2012_256
+ * @param key Initial key
+ * @param label Label
+ * @param seed Seed
+ */
+export const kdf_gostr3411_2012_256 = (key: Uint8Array, label: Uint8Array, seed: Uint8Array): Uint8Array => {
+    return Streebog256HMAC(key).update(concatBytes(
+        new Uint8Array([0x01]),
+        label,
+        new Uint8Array([0x00]),
+        seed,
+        new Uint8Array([0x01, 0x00])
+    )).digest()
+}
+
+/**
+ * KDF_TREE_GOSTR3411_2012_256
+ * @param key Initial key
+ * @param label Label
+ * @param seed Seed
+ * @param keys Number of generated keys
+ * @param i_len Length of iterations value (`R`)
+ */
+export const kdf_tree_gostr3411_2012_256 = (key: Uint8Array, label: Uint8Array, seed: Uint8Array, keys: number, i_len: number = 1): Uint8Array[] => {
+    let keymat: Uint8Array[] = []
+    let _len = numberToBytesBE(BigInt(keys) * 32n * 8n, 1)
+
+    for(let i = 0; i < keys; i++) {
+        keymat.push(Streebog256HMAC(key).update(concatBytes(
+            numberToBytesBE(i + 1, i_len),
+            label,
+            new Uint8Array([0x00]),
+            seed,
+            _len
+        )).digest())
+    }
+
+    return keymat
+}
 
 export * from "./utils"
 export * from "./const"

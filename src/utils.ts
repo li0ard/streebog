@@ -1,3 +1,4 @@
+import { hexToBytes } from "@noble/hashes/utils";
 import { A, BLOCK_SIZE, C, PI, TAU } from "./const";
 
 /** Addition of two 512 bit numbers */
@@ -129,4 +130,13 @@ export const transformG = (n: Uint8Array, hash: Uint8Array, message: Uint8Array)
     temp = transformX(transformE(keys, message), hash.subarray());
 
     return transformX(temp, message)
+}
+
+// Code from `@noble/curves`
+export function numberToBytesBE(n: number | bigint, len: number): Uint8Array {
+    let num = n.toString(16).padStart(len * 2, '0')
+    while (num.length % 2 != 0) {
+        num = "0" + num
+    }
+    return hexToBytes(num);
 }
