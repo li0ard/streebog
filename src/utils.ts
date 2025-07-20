@@ -1,31 +1,20 @@
-import { hexToBytes } from "@noble/hashes/utils";
-import { A, BLOCK_SIZE, C, PI, TAU } from "./const";
+import { A, BLOCKSIZE, C, PI, TAU } from "./const";
+import { xor } from "@li0ard/gost3413/dist/utils";
 
 /** Addition of two 512 bit numbers */
 export const add512 = (a: Uint8Array, b: Uint8Array): Uint8Array => {
-    const result = new Uint8Array(BLOCK_SIZE)
-    let carry = 0;
-    for (let i = 63; i >= 0; i--) {
-        const sum = a[i] + b[i] + carry;
-        result[i] = sum & 0xFF;
-        carry = sum >> 8;
+    const c: Uint8Array = new Uint8Array(64);
+    const tmpA: Uint8Array = new Uint8Array(64);
+    const tmpB: Uint8Array = new Uint8Array(64);
+
+    for (let i = 0; i < a.length; i++) tmpA[63 - i] = a[a.length - i - 1];
+    for (let i = 0; i < b.length; i++) tmpB[63 - i] = b[b.length - i - 1];
+    for (let i = 63, tmp = 0; i >= 0; i--) {
+        tmp = tmpA[i] + tmpB[i] + (tmp >> 8);
+        c[i] = tmp & 0xff;
     }
 
-    return result
-}
-
-/**
- * `X`-transformation.
- * The input of the `X` function is two sequences, each 512 bits long,
- * and the output of the function is the XOR of these two sequences.
- */
-export const transformX = (a: Uint8Array, b: Uint8Array): Uint8Array => {
-    const result = new Uint8Array(BLOCK_SIZE)
-    for (let i = 0; i < BLOCK_SIZE; i++) {
-        result[i] = a[i] ^ b[i];
-    }
-
-    return result
+    return c;
 }
 
 /**
@@ -35,12 +24,10 @@ export const transformX = (a: Uint8Array, b: Uint8Array): Uint8Array => {
  * the `PI` substitution table.
  */
 export const transformS = (input: Uint8Array): Uint8Array => {
-    const result = new Uint8Array(BLOCK_SIZE)
-    for (let i = 0; i < BLOCK_SIZE; i++) {
-        result[i] = PI[input[i]];
-    }
+    const result = new Uint8Array(BLOCKSIZE);
+    for (let i = 0; i < BLOCKSIZE; i++) result[i] = PI[input[i]];
 
-    return result
+    return result;
 }
 
 /**
@@ -49,94 +36,60 @@ export const transformS = (input: Uint8Array): Uint8Array => {
  * one byte is replaced by another.
  */
 export const transformP = (input: Uint8Array): Uint8Array => {
-    const result = new Uint8Array(BLOCK_SIZE)
-    for (let i = 0; i < BLOCK_SIZE; i++) {
-        result[i] = input[TAU[i]];
-    }
+    const result = new Uint8Array(BLOCKSIZE);
+    for (let i = 0; i < BLOCKSIZE; i++) result[i] = input[TAU[i]];
 
-    return result
+    return result;
 }
 
 /**
  * `L`-transformation.
  * Represents the multiplication of a 64-bit input vector by a 64x64 binary matrix `A`.
  */
-export const transformL = (result: Uint8Array): Uint8Array => {
-    const input = new BigUint64Array(8);
-    for (let i = 0; i < 8; i++) {
-        let value = 0n;
-        for (let j = 0; j < 8; j++) {
-            value = (value << 8n) | BigInt(result[i*8 + j]);
-        }
-        input[i] = value;
-    }
+export const transformL = (input: Uint8Array): Uint8Array => {
+    const result: Uint8Array = new Uint8Array(BLOCKSIZE);
 
-    const output = new BigUint64Array(8);
     for (let i = 0; i < 8; i++) {
-        output[i] = 0n;
-        for (let j = 0; j < BLOCK_SIZE; j++) {
-            if ((input[i] >> BigInt(63 - j)) & 1n) {
-                output[i] ^= A[j];
+        const parts: Uint32Array = new Uint32Array(2);
+        const tmp: Uint8Array = input.slice(i * 8, i * 8 + 8).reverse();
+
+        for (let j = 0; j < 8; j++) {
+            for (let k = 0; k < 8; k++) {
+                if ((tmp[7 - j] >> 7 - k) & 1) {
+                    parts[0] ^= A[j * 16 + k * 2];
+                    parts[1] ^= A[j * 16 + k * 2 + 1];
+                }
             }
         }
+
+        result[i * 8] = parts[0] >> 24;
+        result[i * 8 + 1] = (parts[0] << 8) >> 24;
+        result[i * 8 + 2] = (parts[0] << 16) >> 24;
+        result[i * 8 + 3] = (parts[0] << 24) >> 24;
+        result[i * 8 + 4] = parts[1] >> 24;
+        result[i * 8 + 5] = (parts[1] << 8) >> 24;
+        result[i * 8 + 6] = (parts[1] << 16) >> 24;
+        result[i * 8 + 7] = (parts[1] << 24) >> 24;
     }
 
-    const buffer = new Uint8Array(BLOCK_SIZE);
-    for (let i = 0; i < 8; i++) {
-        for (let j = 0; j < 8; j++) {
-            buffer[i*8 + j] = Number((output[i] >> BigInt((7-j)*8)) & 0xFFn);
-        }
-    }
-
-    return buffer
-}
-
-/**
- * XSPL-algorithm.
- * Round key calculation function.
- * 
- * 1. `X` - Addition modulo 2;
- * 2. `S` - Substitution;
- * 3. `P` - Permutation;
- * 4. `L` - Linear transformation
- */
-export const keySchedule = (keys: Uint8Array, iterIndex: number): Uint8Array => {
-    const c = new Uint8Array(C[iterIndex]);
-    return transformL(transformP(transformS(transformX(keys, c))))
+    return result;
 }
 
 /**
  * `E`-transformation.
  * Part of compression function.
  */
-export const transformE = (keys: Uint8Array, block: Uint8Array): Uint8Array => {
-    let result: Uint8Array = new Uint8Array(BLOCK_SIZE)
-    result = transformX(block, keys)
-    
+export const transformE = (block: Uint8Array, keys: Uint8Array): Uint8Array => {
+    let c: Uint8Array = xor(block, keys);
     for (let i = 0; i < 12; i++) {
-        keys = keySchedule(keys, i);
-        result = transformX(transformL(transformP(transformS(result))), keys)
+        block = transformL(transformP(transformS(xor(block, C[i]))));
+        c = xor(transformL(transformP(transformS(c))), block);
     }
-    
-    return result
+
+    return c;
 }
 
-/**
- * Compression function `G` aka XSPLEXX-algorithm
- */
-export const transformG = (n: Uint8Array, hash: Uint8Array, message: Uint8Array): Uint8Array => {
-    let temp: Uint8Array = new Uint8Array(BLOCK_SIZE);
-    let keys = transformL(transformP(transformS(transformX(n, hash))))
-    temp = transformX(transformE(keys, message), hash.subarray());
-
-    return transformX(temp, message)
-}
-
-// Code from `@noble/curves`
-export function numberToBytesBE(n: number | bigint, len: number): Uint8Array {
-    let num = n.toString(16).padStart(len * 2, '0')
-    while (num.length % 2 != 0) {
-        num = "0" + num
-    }
-    return hexToBytes(num);
+/** Compression function `G` aka XSPLEXX-algorithm */
+export const transformG = (hash: Uint8Array, n: Uint8Array, message: Uint8Array): Uint8Array => {
+    return xor(xor(transformE(transformL(transformP(transformS(xor(n, hash)))), message), n), message);
 }
