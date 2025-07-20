@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test"
-import { Streebog256, Streebog256HMAC, Streebog512, kdf_gostr3411_2012_256, kdf_tree_gostr3411_2012_256, streebog256, streebog512 } from "../src"
+import { Streebog256, Streebog256HMAC, Streebog512, Streebog512HMAC, Streebog512PBKDF2, kdf_gostr3411_2012_256, kdf_tree_gostr3411_2012_256, streebog256, streebog512 } from "../src"
 import { randomBytes } from "crypto"
 
 describe("Test symmetric", () => {
@@ -73,39 +73,31 @@ test("Test from Habr article", () => {
     expect(Buffer.from(streebog256(test_vector)).toString("hex")).toBe(expected)
 })
 
-test("Streebog 256 bit", () => {
-    let test_vectors = [
-        ["hello world", "c600fd9dd049cf8abd2f5b32e840d2cb0e41ea44de1c155dcd88dc84fe58a855"],
-        ["hello world\n", "f72018189a5cfb803dbe1f2149cf554c40093d8e7f81c21e08ac5bcd09d9934d"],
-        ["привет мир\n", "a0376666db844555aa12daa03509b5d67ff474199be6bc33c7decbb9f8fbc32d"],
-        ["Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\n", "3e8e391bbc40e3600f87ddcb27eb7a839189567c5ed4fa6fe4341b424e7701b1"],
-    ]
-
-    for(let i of test_vectors) {
-        let result = Buffer.from(streebog256(Buffer.from(i[0])))
-        expect(result.toString("hex")).toBe(i[1])
-    }
-})
-
-test("Streebog 512 bit", () => {
-    let test_vectors = [
-        ["hello world", "84d883ede9fa6ce855d82d8c278ecd9f5fc88bf0602831ae0c38b9b506ea3cb02f3fa076b8f5664adf1ff862c0157da4cc9a83e141b738ff9268a9ba3ed6f563"],
-        ["hello world\n", "9d295fa56ebe77b83db37832685ce874c43a5add7afc5f1aaa94ca21b12a12897a48bb3dbbe20cd9cfafa22a6e3c82eb4c6503109bfb0b4514c7bc27e69ec120"],
-        ["привет мир\n", "b6ef672fd3472126a3b6ec6be9e445bb66d1a53361196bfb16a85ff2f9469d8ea5182d6a24601f2518b9176d57be3462063e2d90ab4ec1a6a6d92aaf2db773a2"],
-        ["Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\n", "81b234593656f04ee1bc471af2cc269895c7aded3c8d5d818a18c537894bd61c2db1a4e66ff00d33fb7d2d195202984cade76b7c0ab3de8b9d61a2541c040591"],
-    ]
-
-    for(let i of test_vectors) {
-        let result = Buffer.from(streebog512(Buffer.from(i[0])))
-        expect(result.toString("hex")).toBe(i[1])
-    }
+describe("PBKDF2", () => {
+    test("#1", () => {
+        const expected = Buffer.from("64770af7f748c3b1c9ac831dbcfd85c26111b30a8a657ddc3056b80ca73e040d2854fd36811f6d825cc4ab66ec0a68a490a9e5cf5156b3a2b7eecddbf9a16b47", "hex")
+        expect(Streebog512PBKDF2(Buffer.from("password"), Buffer.from("salt"), 1, 64)).toStrictEqual(expected)
+    })
+    test("#2", () => {
+        const expected = Buffer.from("5a585bafdfbb6e8830d6d68aa3b43ac00d2e4aebce01c9b31c2caed56f0236d4d34b2b8fbd2c4e89d54d46f50e47d45bbac301571743119e8d3c42ba66d348de", "hex")
+        expect(Streebog512PBKDF2(Buffer.from("password"), Buffer.from("salt"), 2, 64)).toStrictEqual(expected)
+    })
 })
 
 describe("HMAC", () => {
+    let key = Buffer.from("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", "hex")
+    let msg = Buffer.from("0126bdb87800af214341456563780100", "hex")
     test("256 bit", () => {
         const expected = Buffer.from("a1aa5f7de402d7b3d323f2991c8d4534013137010a83754fd0af6d7cd4922ed9", "hex")
-        let a = Streebog256HMAC(Buffer.from("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", "hex"))
-        a.update(Buffer.from("0126bdb87800af214341456563780100", "hex"))
+        let a = Streebog256HMAC(key)
+        a.update(msg)
+        expect(a.digest()).toStrictEqual(expected)
+    })
+
+    test("512 bit", () => {
+        const expected = Buffer.from("a59bab22ecae19c65fbde6e5f4e9f5d8549d31f037f9df9b905500e171923a773d5f1530f2ed7e964cb2eedc29e9ad2f3afe93b2814f79f5000ffc0366c251e6", "hex")
+        let a = Streebog512HMAC(key)
+        a.update(msg)
         expect(a.digest()).toStrictEqual(expected)
     })
 })

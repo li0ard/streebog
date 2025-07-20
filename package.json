@@ -1,6 +1,6 @@
 {
   "name": "@li0ard/streebog",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": "li0ard",
   "repository": {
     "type": "git",
@@ -32,6 +32,7 @@
   "type": "module",
   "types": "dist/index.d.ts",
   "dependencies": {
+    "@li0ard/gost3413": "^0.1.4",
     "@noble/hashes": "^1.8.0"
   }
 }
