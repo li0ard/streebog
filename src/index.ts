@@ -1,7 +1,6 @@
 import { BLOCKSIZE } from "./const";
-import { concatBytes } from "@li0ard/gost3413/dist/utils";
-import { transformG, add512 } from "./utils";
-import { pad1 } from "@li0ard/gost3413";
+import { concatBytes } from "@noble/hashes/utils";
+import { transformG, add512, pad } from "./utils";
 
 /**
  * Streebog core class
@@ -57,7 +56,7 @@ export class Streebog {
         let paddedMsg: Uint8Array = new Uint8Array(BLOCKSIZE);
         const msg: Uint8Array = message.slice(0, message.length - (blocks - 1) * 64);
         if (msg.length < BLOCKSIZE) {
-            paddedMsg = pad1(paddedMsg, BLOCKSIZE);
+            paddedMsg = pad(paddedMsg);
 
             paddedMsg[BLOCKSIZE - msg.length - 1] = 0x01;
             for (let i = 0; i < msg.length; i++) {

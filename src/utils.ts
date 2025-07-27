@@ -1,5 +1,14 @@
 import { A, BLOCKSIZE, C, PI, TAU } from "./const";
-import { xor } from "@li0ard/gost3413/dist/utils";
+
+/** XOR two Uint8Array arrays */
+export const xor = (a: Uint8Array, b: Uint8Array) => {
+    let mlen = Math.min(a.length, b.length);
+    let result = new Uint8Array(mlen);
+    for(let i = 0; i < mlen; i++) result[i] = a[i] ^ b[i];
+
+    return result.slice();
+}
+
 
 /** Addition of two 512 bit numbers */
 export const add512 = (a: Uint8Array, b: Uint8Array): Uint8Array => {
@@ -92,4 +101,50 @@ export const transformE = (block: Uint8Array, keys: Uint8Array): Uint8Array => {
 /** Compression function `G` aka XSPLEXX-algorithm */
 export const transformG = (hash: Uint8Array, n: Uint8Array, message: Uint8Array): Uint8Array => {
     return xor(xor(transformE(transformL(transformP(transformS(xor(n, hash)))), message), n), message);
+}
+
+const asciis = { _0: 48, _9: 57, A: 65, F: 70, a: 97, f: 102 } as const;
+function asciiToBase16(ch: number): number | undefined {
+    if (ch >= asciis._0 && ch <= asciis._9) return ch - asciis._0; // '2' => 50-48
+    if (ch >= asciis.A && ch <= asciis.F) return ch - (asciis.A - 10); // 'B' => 66-(65-10)
+    if (ch >= asciis.a && ch <= asciis.f) return ch - (asciis.a - 10); // 'b' => 98-(97-10)
+    return;
+}
+/** Convert hex to bytes */
+export function hexToBytes(hex: string): Uint8Array {
+    if (typeof hex !== 'string') throw new Error('hex string expected, got ' + typeof hex);
+    const hl = hex.length;
+    const al = hl / 2;
+    if (hl % 2) throw new Error('hex string expected, got unpadded hex of length ' + hl);
+    const array = new Uint8Array(al);
+    for (let ai = 0, hi = 0; ai < al; ai++, hi += 2) {
+        const n1 = asciiToBase16(hex.charCodeAt(hi));
+        const n2 = asciiToBase16(hex.charCodeAt(hi + 1));
+        if (n1 === undefined || n2 === undefined) {
+            const char = hex[hi] + hex[hi + 1];
+            throw new Error('hex string expected, got non-hex character "' + char + '" at index ' + hi);
+        }
+        array[ai] = n1 * 16 + n2; // multiply first octet, e.g. 'a3' => 10*16+3 => 160 + 3 => 163
+    }
+    return array;
+}
+
+/** Convert number to bytes (Big-Endian) */
+export function numberToBytesBE(n: number | bigint, len: number): Uint8Array {
+    let num = n.toString(16).padStart(len * 2, '0');
+    while (num.length % 2 != 0) num = "0" + num;
+    return hexToBytes(num);
+}
+
+const getPadLength = (dataLength: number): number => {
+    if(dataLength < BLOCKSIZE) return BLOCKSIZE - dataLength;
+    if(dataLength % BLOCKSIZE == 0) return 0;
+    return BLOCKSIZE - dataLength % BLOCKSIZE;
+}
+
+/** Padding for blocks */
+export const pad = (data: Uint8Array): Uint8Array => {
+    const padded = new Uint8Array(data.length + getPadLength(data.length));
+    padded.set(data);
+    return padded;
 }

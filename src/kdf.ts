@@ -1,5 +1,6 @@
-import { concatBytes, hexToBytes, numberToBytesBE } from "@li0ard/gost3413/dist/utils"
+import { concatBytes, hexToBytes } from "@noble/hashes/utils"
 import { Streebog256HMAC } from "./index"
+import { numberToBytesBE } from "./utils";
 
 /**
  * `KDF_GOSTR3411_2012_256`
