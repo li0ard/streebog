@@ -1,4 +1,4 @@
-import { A, BLOCKSIZE, C, PI, TAU } from "./const";
+import { A, BLOCKSIZE, C, PI, TAU } from "./const.js";
 
 /** XOR two Uint8Array arrays */
 export const xor = (a: Uint8Array, b: Uint8Array) => {

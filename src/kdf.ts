@@ -1,6 +1,6 @@
-import { concatBytes, hexToBytes } from "@noble/hashes/utils"
-import { Streebog256HMAC } from "./index"
-import { numberToBytesBE } from "./utils";
+import { concatBytes, hexToBytes } from "@noble/hashes/utils.js"
+import { Streebog256HMAC } from "./index.js"
+import { numberToBytesBE } from "./utils.js";
 
 /**
  * `KDF_GOSTR3411_2012_256`
@@ -25,12 +25,10 @@ export const kdf_gostr3411_2012_256 = (key: Uint8Array, label: Uint8Array, seed:
  * @param i_len Length of iterations value (`R`)
  */
 export const kdf_tree_gostr3411_2012_256 = (key: Uint8Array, label: Uint8Array, seed: Uint8Array, keys: number, i_len: number = 1): Uint8Array[] => {
-    let keymat: Uint8Array[] = [];
-    let length = numberToBytesBE(BigInt(keys) * 32n * 8n, 1);
+    const keymat: Uint8Array[] = [];
+    const length = numberToBytesBE(BigInt(keys) * 32n * 8n, 1);
 
-    for(let i = 0; i < keys; i++) {
-        keymat.push(Streebog256HMAC(key).update(concatBytes(numberToBytesBE(i + 1, i_len), label, hexToBytes("00"), seed, length)).digest());
-    }
+    for(let i = 0; i < keys; i++) keymat.push(Streebog256HMAC(key).update(concatBytes(numberToBytesBE(i + 1, i_len), label, hexToBytes("00"), seed, length)).digest());
 
     return keymat;
 }

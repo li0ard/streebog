@@ -1,6 +1,6 @@
-import { BLOCKSIZE } from "./const";
-import { concatBytes } from "@noble/hashes/utils";
-import { transformG, add512, pad } from "./utils";
+import { BLOCKSIZE } from "./const.js";
+import { concatBytes } from "@noble/hashes/utils.js";
+import { transformG, add512, pad } from "./utils.js";
 
 /**
  * Streebog core class
@@ -38,7 +38,7 @@ export class Streebog {
      * @param buf - Output Uint8Array
      */
     public digestInto(buf: Uint8Array): Uint8Array {
-        let message = this.buffer.slice().reverse();
+        const message = this.buffer.slice().reverse();
         let n: Uint8Array = new Uint8Array(BLOCKSIZE);
         let sigma: Uint8Array = new Uint8Array(BLOCKSIZE);
         let hash: Uint8Array = new Uint8Array(64).fill(this.is512 ? 0 : 1);
@@ -59,9 +59,7 @@ export class Streebog {
             paddedMsg = pad(paddedMsg);
 
             paddedMsg[BLOCKSIZE - msg.length - 1] = 0x01;
-            for (let i = 0; i < msg.length; i++) {
-                paddedMsg[BLOCKSIZE - msg.length + i] = msg[i];
-            }
+            for (let i = 0; i < msg.length; i++) paddedMsg[BLOCKSIZE - msg.length + i] = msg[i];
         }
 
         const msgLen: Uint8Array = new Uint8Array(4);
@@ -75,8 +73,8 @@ export class Streebog {
 
         if (this.is512) buf.set(hash.slice().reverse());
         else buf.set(hash.slice(0, 32).reverse());
-        this.reset()
-        return buf
+        this.reset();
+        return buf;
     }
 }
 
@@ -127,6 +125,6 @@ export const streebog256 = (input: Uint8Array): Uint8Array => new Streebog256().
  */
 export const streebog512 = (input: Uint8Array): Uint8Array => new Streebog512().update(input).digest();
 
-export * from "./hmac";
-export * from "./kdf";
-export * from "./pbkdf2";
+export * from "./hmac.js";
+export * from "./kdf.js";
+export * from "./pbkdf2.js";
